@@ -1,0 +1,29 @@
+{
+  "name": "payment-example-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "정비 전산 결제 연동 예제 토스 POS 플러그인",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "build": "vite build",
+    "zip": "node scripts/make-zip.mjs",
+    "release": "npm run typecheck && npm test && npm run build && npm run zip"
+  },
+  "dependencies": {
+    "@tossplace/pos-plugin-sdk": "0.0.31",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

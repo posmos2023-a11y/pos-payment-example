@@ -1,0 +1,103 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #191f28;
+  --muted: #6b7684;
+  --line: #e5e8eb;
+  --primary: #3182f6;
+  --primary-weak: #e8f3ff;
+  --danger: #f04452;
+  --danger-weak: #ffeeee;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.app { max-width: 720px; margin: 0 auto; padding: 0 12px 32px; }
+
+h2 { font-size: 15px; margin: 20px 4px 8px; color: var(--muted); font-weight: 600; }
+
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.center { text-align: center; padding: 24px 0; }
+.right { text-align: right; margin: 4px 0 8px; }
+.bad { color: var(--danger); }
+
+/* 탭 바 */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 10px 0;
+  background: var(--bg);
+}
+.tabs button {
+  flex: 1;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+.tabs button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+
+/* 카드·목록 */
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--card); border-radius: 16px; overflow: hidden; }
+.card.pad { padding: 16px; margin-bottom: 8px; }
+.list > .card.pad { margin-bottom: 0; }
+
+.actions { display: flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; }
+.card.pad .actions { padding: 0; margin-top: 12px; }
+
+/* 버튼 */
+.btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #e9ebee;
+  font-weight: 600;
+}
+.btn.primary { background: var(--primary); color: #fff; }
+
+/* 입력 */
+input[type='url'], input[type='text'], input[type='password'] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; font-weight: 600; }
+.field small { font-weight: 400; }
+.check { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-weight: 600; }
+.check input { width: 20px; height: 20px; }
+
+.notice { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--primary-weak); color: #1b64da; font-size: 14px; }
+.notice.error { background: var(--danger-weak); color: var(--danger); }
+
+.facts { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+
+@media (max-width: 420px) {
+  .actions .btn { flex: 1; padding: 0 8px; }
+}

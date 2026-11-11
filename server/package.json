@@ -1,0 +1,17 @@
+{
+  "name": "payment-example-server",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "정비 전산 서버의 결제 연동 예제: 토스 POS 플러그인 접속 창구, [담기] 명령 전달, 결제 반영, 토스 결제 웹훅 수신",
+  "type": "module",
+  "engines": { "node": ">=22.9" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.js",
+    "add-shop": "node scripts/add-shop.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "8.22.2"
+  }
+}
