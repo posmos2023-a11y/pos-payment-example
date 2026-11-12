@@ -33,14 +33,6 @@ export function Payment({ runtime, toast, configured }: Props) {
     }
   };
 
-  const recheck = async () => {
-    const r = await runtime.bridge.reconcile();
-    if (r.error) toast.error(`결제를 확인하지 못했어요: ${r.error}`);
-    else if (!r.ran) toast.warn('확인할 결제 대기 기록이 없어요');
-    else if (r.paid + r.cancelled === 0) toast.success('놓친 결제가 없어요');
-    else toast.success(`놓친 결제 ${r.paid + r.cancelled}건을 전산에 알렸어요`);
-  };
-
   return (
     <section>
       <p className="notice">
@@ -128,11 +120,6 @@ export function Payment({ runtime, toast, configured }: Props) {
           ))}
         </ul>
       )}
-      <div className="actions">
-        <button type="button" className="btn" disabled={view.reconciling} onClick={() => void recheck()}>
-          {view.reconciling ? '확인하고 있어요' : '결제 다시 확인'}
-        </button>
-      </div>
     </section>
   );
 }
