@@ -53,6 +53,8 @@ npm start
 | `HOST` | `127.0.0.1` | 바인딩 주소 |
 | `PORT` | `8787` | POS 창구·웹훅 포트 |
 | `ADMIN_PORT` | `PORT`+1 | 정비 전산 흉내 화면 포트(항상 `127.0.0.1`) |
+| `ADMIN_PASSWORD` | 없음 | 클라우드 시험용. 12자 이상이면 화면 `/` 과 `/api/*` 를 **POS 포트에도** 열고 HTTP Basic 인증(사용자 이름 아무거나, 비밀번호 = 이 값)을 건다. 같은 IP 가 10분에 10번 틀리면 429. 12자 미만이면 시작 시 오류. 없으면 위 표처럼 `ADMIN_PORT` 로만 열림 |
+| `SHOP_TOKEN`, `SHOP_NAME` | 없음 | `data/shops.json` 이 없을 때 이 토큰(24자 이상, 아니면 시작 시 오류)으로 시험 매장을 만든다(이름은 `SHOP_NAME`, 기본 "시험 매장"). 토큰을 콘솔에 출력하지 않는다. 없으면 무작위 토큰을 만들어 한 번 출력 |
 | `TOSS_WEBHOOK_SECRET` | 없음 | 토스 웹훅 서명 시크릿. 없으면 `/toss/webhook` 은 503 |
 | `TOSS_OPENAPI_ACCESS_KEY`, `TOSS_OPENAPI_SECRET_KEY` | 없음 | 주문 조회용 키. 없으면 승인 웹훅은 처리하지 않고(경고만), 취소 웹훅은 결제 ID·주문 ID 로만 처리. **없으면 단말의 결제 알림을 확인 없이 반영하는 시험 모드**가 됩니다(아래 "결제 반영 규칙") |
 | `TOSS_OPENAPI_BASE_URL` | `https://open-api.tossplace.com/api-public/openapi/v1` | Open API 주소 |
@@ -86,6 +88,35 @@ POS 는 인터넷으로 접속하므로 **외부에서 접근 가능한 https �
 1. 토스 개발자센터 ACL 에 `https://<도메인>` 과 `wss://<도메인>` 을 등록합니다.
 2. POS 플러그인 설정에 기준 주소(`https://<도메인>`)와 매장 토큰을 입력합니다.
 3. 가맹점이 POS 서비스 연동 화면에서 서비스 코드를 입력합니다.
+
+## Render 같은 클라우드에 올려 시험하기
+
+내 PC 대신 클라우드에 서버를 올려 실제 토스 POS 로 시험하는 방법입니다(Render 기준). **시험용**이며 운영 구성이 아닙니다.
+
+Render 에서 Web Service 를 만들고 다음과 같이 설정합니다.
+
+| 항목 | 값 |
+|---|---|
+| Root Directory | `server` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+
+환경변수:
+
+| 이름 | 값 |
+|---|---|
+| `HOST` | `0.0.0.0` (필수. 기본값 `127.0.0.1` 로는 Render 가 접속하지 못함) |
+| `ADMIN_PASSWORD` | 12자 이상 비밀번호. 화면을 보려면 필요 |
+| `SHOP_TOKEN` | 24자 이상 무작위 문자열. POS 플러그인 설정에 넣을 매장 토큰 |
+| `TOSS_WEBHOOK_SECRET` | (웹훅을 시험할 때) 토스 개발자센터에서 발급된 시크릿 |
+| `TOSS_OPENAPI_ACCESS_KEY`, `TOSS_OPENAPI_SECRET_KEY` | (결제 확인을 시험할 때) Open API 키. 없으면 단말의 결제 알림을 확인 없이 반영하는 시험 모드 |
+
+`PORT` 는 Render 가 정해 주므로 넣지 않습니다. 무작위 값은 예를 들어 `node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"` 로 만들 수 있습니다.
+
+- 정비 전산 흉내 화면: `https://<서비스>.onrender.com/` 을 열면 브라우저가 인증을 묻습니다. 사용자 이름은 아무거나, 비밀번호는 `ADMIN_PASSWORD`. 이 모드에서는 화면과 `/api/*` 가 POS 포트에서 열리므로 비밀번호를 길고 무작위로 정하세요. 인증 실패가 반복되면(같은 IP 10분에 10번) 429 로 막습니다.
+- 토스 개발자센터 ACL 에 `https://<서비스>.onrender.com` 과 `wss://<서비스>.onrender.com` 을 등록하고, POS 플러그인 설정에는 기준 주소 `https://<서비스>.onrender.com` 과 `SHOP_TOKEN` 값을 넣습니다. 웹훅 주소는 `https://<서비스>.onrender.com/toss/webhook` 입니다.
+- 무료 요금제는 한동안 요청이 없으면 서버가 잠들고(다음 요청에 깨어나는 데 시간이 걸림), 저장이 메모리뿐이며 파일도 재시작 때 사라집니다. 재시작하면 **작업 목록·명령·결제 기록이 사라집니다.** `SHOP_TOKEN` 을 환경변수로 두는 것은 재시작해도 매장 토큰이 바뀌지 않게 하려는 것입니다.
+- 서버가 잠든 동안에는 토스 웹훅과 POS 접속이 지연되거나 실패할 수 있으니, 시험 직전에 `https://<서비스>.onrender.com/health` 를 열어 깨워 두세요.
 
 ## 토스 웹훅 등록
 

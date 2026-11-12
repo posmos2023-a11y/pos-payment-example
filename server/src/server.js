@@ -1,8 +1,10 @@
 // HTTP·WebSocket 서버와 라우팅.
 //   /pos/ws, /pos/poll, /pos/events   POS 플러그인 접속 창구 (매장 토큰 인증)
 //   /toss/webhook                     토스 결제 웹훅 (서명 인증)
-//   /, /api/*                         정비 전산 흉내 화면 (인증 없음. 127.0.0.1 전용의 별도 포트에서만 연다)
+//   /, /api/*                         정비 전산 흉내 화면 (기본: 인증 없음, 127.0.0.1 전용의 별도 포트에서만 연다.
+//                                     config.adminPassword 가 있으면 POS 포트에도 열고 HTTP Basic 인증을 건다)
 import http from 'node:http';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { WebSocketServer } from 'ws';
@@ -114,6 +116,26 @@ function assertLocal(req) {
   }
 }
 
+const sha256 = (s) => createHash('sha256').update(s).digest();
+const AUTH_FAIL_LIMIT = 10; // 같은 IP 가 AUTH_FAIL_WINDOW_MS 안에 이만큼 틀리면 429
+const AUTH_FAIL_WINDOW_MS = 10 * 60_000;
+const AUTH_FAIL_MAX_IPS = 5000; // 기록하는 IP 수 상한(메모리 보호)
+
+/** 속도 제한용 IP: x-forwarded-for 의 첫 값, 없으면 소켓 주소. 인증 판단에는 쓰지 않는다. */
+function clientIp(req) {
+  const xff = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+  return xff || req.socket.remoteAddress || 'unknown';
+}
+
+/** Authorization: Basic 의 비밀번호 부분(사용자 이름은 무시). 형식이 틀리면 ''. */
+function basicPassword(req) {
+  const m = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(req.headers.authorization ?? '');
+  if (!m) return '';
+  const decoded = Buffer.from(m[1], 'base64').toString('utf8');
+  const i = decoded.indexOf(':');
+  return i < 0 ? '' : decoded.slice(i + 1);
+}
+
 /**
  * 서버 만들기. 테스트에서는 clock·fetchImpl·timings 를 바꿔 끼운다.
  * @param {object} opts
@@ -124,6 +146,9 @@ export function createApp({
   const t = {
     pingIntervalMs: 25_000, idleTimeoutMs: 70_000, sweepIntervalMs: 2_000, memoRecheckMs: 30_000, ...timings,
   };
+  if (config.adminPassword && config.adminPassword.length < 12) throw new Error('ADMIN_PASSWORD 는 12자 이상이어야 해요');
+  const adminDigest = config.adminPassword ? sha256(config.adminPassword) : null;
+  const authFails = new Map(); // ip -> 실패 시각 목록
   const store = new Store({ clock, persistShops });
   store.loadShops(shops);
   const origAddEvent = store.addEvent.bind(store);
@@ -288,8 +313,37 @@ export function createApp({
     return { shop, label, lines };
   }
 
+  /** ADMIN_PASSWORD 모드: HTTP Basic 인증. 같은 IP 가 10분에 10회 틀리면 429(그동안은 맞는 비밀번호도 받지 않는다). */
+  function requireAdminAuth(req) {
+    const ip = clientIp(req);
+    const now = clock.now();
+    const recent = (authFails.get(ip) ?? []).filter((ts) => now - ts < AUTH_FAIL_WINDOW_MS);
+    if (recent.length >= AUTH_FAIL_LIMIT) {
+      authFails.set(ip, recent);
+      throw new AppError(429, 'TOO_MANY_ATTEMPTS', '인증에 너무 많이 실패했어요. 잠시 뒤에 다시 시도하세요');
+    }
+    if (timingSafeEqual(sha256(basicPassword(req)), adminDigest)) {
+      if (recent.length) authFails.set(ip, recent); else authFails.delete(ip);
+      return;
+    }
+    recent.push(now);
+    authFails.set(ip, recent);
+    if (authFails.size > AUTH_FAIL_MAX_IPS) { // 오래된 기록부터 정리
+      for (const [k, v] of authFails) {
+        if (!v.some((ts) => now - ts < AUTH_FAIL_WINDOW_MS)) authFails.delete(k);
+      }
+      while (authFails.size > AUTH_FAIL_MAX_IPS) authFails.delete(authFails.keys().next().value);
+    }
+    throw new AppError(401, 'UNAUTHORIZED', '인증이 필요해요');
+  }
+
   async function handleLocal(req, res, url) {
-    assertLocal(req);
+    if (adminDigest) {
+      res.setHeader('cache-control', 'no-store'); // 인증 실패 응답 포함, 이 모드의 모든 응답
+      requireAdminAuth(req);
+    } else {
+      assertLocal(req);
+    }
     const { pathname } = url;
     if (req.method === 'GET' && pathname === '/') {
       const html = await readFile(INDEX_HTML);
@@ -354,6 +408,7 @@ export function createApp({
       if (!isApp) store.addEvent('error', `요청 처리 오류: ${err instanceof Error ? err.message : 'unknown'}`);
       if (res.headersSent) return res.end();
       const extra = req.url?.startsWith('/pos/') ? { ...CORS } : {};
+      if (isApp && err.status === 401 && adminDigest && !req.url?.startsWith('/pos/')) extra['www-authenticate'] = 'Basic realm="admin"';
       if (isApp && err.status === 413) {
         res.once('finish', () => req.destroy()); // 큰 본문을 더 받지 않는다
         extra.connection = 'close';
@@ -387,7 +442,7 @@ export function createApp({
      */
     async listen(port, host = '127.0.0.1', { adminPort } = {}) {
       const posPort = await listenOn(server, port, host);
-      if (adminPort === undefined) {
+      if (adminPort === undefined || adminDigest) { // ADMIN_PASSWORD 가 있으면 화면을 POS 포트에 연다(Basic 인증)
         adminOnPublic = true;
       } else {
         adminServer = http.createServer((req, res) => { route(req, res, true); });

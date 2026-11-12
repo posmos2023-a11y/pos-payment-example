@@ -20,11 +20,15 @@ export function saveShops(dataDir, shops) {
   renameSync(tmp, file);
 }
 
-/** 파일이 없으면 시험 매장 1개를 만들고 token 을 한 번 알려 준다(onCreated). */
-export function loadOrCreateShops(dataDir, onCreated = () => {}) {
+/**
+ * 파일이 없으면 시험 매장 1개를 만들고 알려 준다(onCreated).
+ * seed.token 이 있으면 그 토큰을 쓰고(24자 미만이면 오류), 없으면 무작위로 만든다.
+ */
+export function loadOrCreateShops(dataDir, onCreated = () => {}, seed = {}) {
   const file = shopsFile(dataDir);
   if (!existsSync(file)) {
-    const shop = { id: 1, name: '시험 매장', token: newToken() };
+    if (seed.token && seed.token.length < 24) throw new Error('SHOP_TOKEN 은 24자 이상이어야 해요');
+    const shop = { id: 1, name: seed.name || '시험 매장', token: seed.token || newToken() };
     saveShops(dataDir, [shop]);
     onCreated(shop);
     return [shop];
